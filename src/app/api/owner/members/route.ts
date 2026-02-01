@@ -11,18 +11,24 @@ const supabase = createClient(
 
 // Helper to get user's airline ID
 async function getOwnerAirlineId(discordId: string): Promise<string | null> {
-    if (discordId === ADMIN_DISCORD_ID) {
-        const { data } = await supabase.from("airlines").select("id").limit(1);
-        return data?.[0]?.id || null;
-    }
-
-    const { data } = await supabase
+    // Check owners table first (for everyone including admin)
+    const { data: ownerData } = await supabase
         .from("owners")
         .select("airline_id")
         .eq("discord_id", discordId)
         .single();
 
-    return data?.airline_id || null;
+    if (ownerData?.airline_id) {
+        return ownerData.airline_id;
+    }
+
+    // Admin fallback: if not in owners table, return first airline
+    if (discordId === ADMIN_DISCORD_ID) {
+        const { data } = await supabase.from("airlines").select("id").order("name").limit(1);
+        return data?.[0]?.id || null;
+    }
+
+    return null;
 }
 
 // GET - List members (profiles with airline_id matching owner's airline)

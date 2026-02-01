@@ -18,12 +18,31 @@ export async function GET(request: NextRequest) {
         }
 
         const discordId = session.user.discordId;
+        const isAdmin = discordId === ADMIN_DISCORD_ID;
 
-        // Admin has access to first airline (or should select)
-        if (discordId === ADMIN_DISCORD_ID) {
+        // Check owners table first (for both admin and regular users)
+        const { data: ownership, error } = await supabase
+            .from("owners")
+            .select("*, airlines(*)")
+            .eq("discord_id", discordId)
+            .limit(1)
+            .single();
+
+        // If found in owners table, return that airline
+        if (!error && ownership && ownership.airlines) {
+            return NextResponse.json({
+                isOwner: true,
+                isAdmin: isAdmin,
+                airline: ownership.airlines,
+            });
+        }
+
+        // Admin fallback: if not in owners table, return first airline
+        if (isAdmin) {
             const { data: airlines } = await supabase
                 .from("airlines")
                 .select("*")
+                .order("name")
                 .limit(1);
 
             return NextResponse.json({
@@ -33,22 +52,8 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Check owners table
-        const { data: ownership, error } = await supabase
-            .from("owners")
-            .select("*, airlines(*)")
-            .eq("discord_id", discordId)
-            .limit(1)
-            .single();
-
-        if (error || !ownership) {
-            return NextResponse.json({ isOwner: false, airline: null });
-        }
-
-        return NextResponse.json({
-            isOwner: true,
-            airline: ownership.airlines,
-        });
+        // Regular user not in owners table
+        return NextResponse.json({ isOwner: false, airline: null });
     } catch (error) {
         console.error("Error checking ownership:", error);
         return NextResponse.json({ error: "Internal error" }, { status: 500 });

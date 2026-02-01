@@ -96,6 +96,20 @@ export const authOptions: NextAuthOptions = {
 
                     token.role = role;
 
+                    // Build Discord avatar URL from multiple possible sources
+                    let avatarUrl: string | null = null;
+
+                    // Source 1: profile.image (NextAuth provides full avatar URL)
+                    if (discordProfile.image) {
+                        avatarUrl = discordProfile.image;
+                    }
+                    // Source 2: Build from avatar hash
+                    else if (discordProfile.avatar && discordProfile.id) {
+                        avatarUrl = `https://cdn.discordapp.com/avatars/${discordProfile.id}/${discordProfile.avatar}.png`;
+                    }
+
+                    console.log(`[Auth] User ${discordProfile.id} - avatar sources: image=${discordProfile.image}, hash=${discordProfile.avatar}, final=${avatarUrl}`);
+
                     // Upsert profile to database (only for non-banned users)
                     await supabase
                         .from("profiles")
@@ -104,7 +118,7 @@ export const authOptions: NextAuthOptions = {
                             discord_id: discordProfile.id,
                             username: discordProfile.username || discordProfile.name,
                             display_name: discordProfile.name,
-                            avatar: discordProfile.image,
+                            avatar: avatarUrl,
                             role: role,
                             updated_at: new Date().toISOString(),
                         }, {

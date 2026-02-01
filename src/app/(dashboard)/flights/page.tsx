@@ -26,7 +26,7 @@ import {
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlowButton } from "@/components/ui/glow-button";
 import { FlightTimer } from "@/components/ui/flight-timer";
-import { AIRPORTS, AIRCRAFT_LIST } from "@/lib/constants";
+import { AIRPORTS } from "@/lib/constants";
 import { createNotification } from "@/lib/notifications";
 
 type FlightStatus = "IN_FLIGHT" | "LANDED" | "EMERGENCY" | "REQUESTING_GROUND_CREW";
@@ -103,6 +103,8 @@ export default function FlightsPage() {
     const [modalView, setModalView] = useState<ModalView>("main");
     const [isLoaded, setIsLoaded] = useState(false);
     const [airlines, setAirlines] = useState<{ id: string; name: string }[]>([]);
+    const [airlineFleet, setAirlineFleet] = useState<{ id: string; aircraft_name: string }[]>([]);
+    const [loadingFleet, setLoadingFleet] = useState(false);
 
     // Fetch airlines from database
     useEffect(() => {
@@ -119,6 +121,24 @@ export default function FlightsPage() {
         }
         fetchAirlines();
     }, []);
+
+    // Fetch fleet when airline is selected
+    const fetchFleet = async (airlineId: string) => {
+        if (!airlineId) {
+            setAirlineFleet([]);
+            return;
+        }
+        setLoadingFleet(true);
+        try {
+            const res = await fetch(`/api/airlines/fleet?airlineId=${airlineId}`);
+            const data = await res.json();
+            setAirlineFleet(data.aircraft || []);
+        } catch (e) {
+            console.error('Failed to fetch fleet:', e);
+            setAirlineFleet([]);
+        }
+        setLoadingFleet(false);
+    };
 
     // Load active flight from localStorage on mount (only when session is ready)
     useEffect(() => {
@@ -631,7 +651,15 @@ export default function FlightsPage() {
                                         className="w-full h-14 px-4 rounded-xl bg-gray-800/50 border-2 border-white/10 text-white text-lg focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all appearance-none cursor-pointer"
                                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2322d3ee'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center', backgroundSize: '20px' }}
                                         value={formData.airline}
-                                        onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
+                                        onChange={(e) => {
+                                            const selectedAirline = airlines.find(a => a.name === e.target.value);
+                                            setFormData({ ...formData, airline: e.target.value, aircraftType: "" });
+                                            if (selectedAirline) {
+                                                fetchFleet(selectedAirline.id);
+                                            } else {
+                                                setAirlineFleet([]);
+                                            }
+                                        }}
                                         required
                                     >
                                         <option value="">Chọn hãng bay</option>
@@ -677,15 +705,18 @@ export default function FlightsPage() {
                                         Loại máy bay *
                                     </label>
                                     <select
-                                        className="w-full h-14 px-4 rounded-xl bg-gray-800/50 border-2 border-white/10 text-white text-lg focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all appearance-none cursor-pointer"
+                                        className="w-full h-14 px-4 rounded-xl bg-gray-800/50 border-2 border-white/10 text-white text-lg focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all appearance-none cursor-pointer disabled:opacity-50"
                                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2322d3ee'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center', backgroundSize: '20px' }}
                                         value={formData.aircraftType}
                                         onChange={(e) => setFormData({ ...formData, aircraftType: e.target.value })}
                                         required
+                                        disabled={!formData.airline || loadingFleet}
                                     >
-                                        <option value="">Chọn máy bay</option>
-                                        {AIRCRAFT_LIST.map((aircraft) => (
-                                            <option key={aircraft} value={aircraft}>{aircraft}</option>
+                                        <option value="">
+                                            {loadingFleet ? "Đang tải..." : !formData.airline ? "Chọn hãng bay trước" : airlineFleet.length === 0 ? "Hãng chưa có máy bay" : "Chọn máy bay"}
+                                        </option>
+                                        {airlineFleet.map((aircraft) => (
+                                            <option key={aircraft.id} value={aircraft.aircraft_name}>{aircraft.aircraft_name}</option>
                                         ))}
                                     </select>
                                 </div>

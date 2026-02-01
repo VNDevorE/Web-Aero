@@ -32,6 +32,7 @@ interface Member {
     discord_id: string;
     username: string;
     display_name: string | null;
+    avatar: string | null;
     balance: number;
     role: string;
 }
@@ -288,8 +289,8 @@ export default function OwnerPanelPage() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as TabType)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === tab.id
-                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                : "bg-gray-800/50 text-gray-400 border border-white/5 hover:text-white"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            : "bg-gray-800/50 text-gray-400 border border-white/5 hover:text-white"
                             }`}
                     >
                         <tab.icon className="w-4 h-4" />
@@ -330,9 +331,17 @@ export default function OwnerPanelPage() {
                             {members.map((member) => (
                                 <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-gray-800/50">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">
-                                            <User className="w-5 h-5 text-gray-400" />
-                                        </div>
+                                        {member.avatar ? (
+                                            <img
+                                                src={member.avatar}
+                                                alt={member.display_name || member.username}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-amber-400 font-bold">
+                                                {(member.display_name || member.username || "?").charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
                                         <div>
                                             <p className="text-white font-medium">{member.display_name || member.username}</p>
                                             <p className="text-gray-400 text-sm">ID: {member.discord_id}</p>
