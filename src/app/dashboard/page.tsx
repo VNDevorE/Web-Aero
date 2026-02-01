@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
 import {
     DollarSign,
     Plane,
@@ -16,9 +17,8 @@ import { FlightTimer } from "@/components/ui/flight-timer";
 import { formatMoney } from "@/lib/utils";
 import Link from "next/link";
 
-// Mock data for demonstration
-const mockStats = {
-    balance: 1234567,
+// Real stats state (will be fetched from API)
+const defaultStats = {
     activeFlights: 12,
     kpiScore: 156,
     totalMembers: 48,
@@ -72,6 +72,25 @@ const mockAirlines = [
 
 export default function DashboardPage() {
     const { data: session } = useSession();
+    const [balance, setBalance] = useState<number>(0);
+    const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+
+    // Fetch real balance from API
+    useEffect(() => {
+        const fetchBalance = async () => {
+            try {
+                const res = await fetch("/api/users/balance");
+                const data = await res.json();
+                setBalance(data.balance || 0);
+            } catch (error) {
+                console.error("Error fetching balance:", error);
+            } finally {
+                setIsLoadingBalance(false);
+            }
+        };
+
+        fetchBalance();
+    }, []);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -85,7 +104,7 @@ export default function DashboardPage() {
                         Đây là tổng quan về hoạt động hàng không của bạn
                     </p>
                 </div>
-                <Link href="/dashboard/flights">
+                <Link href="/flights">
                     <GlowButton>
                         <Plane className="w-4 h-4" />
                         Khai báo chuyến bay
@@ -97,31 +116,29 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatsCard
                     title="Số dư tài khoản"
-                    value={mockStats.balance}
+                    value={isLoadingBalance ? 0 : balance}
                     prefix="$"
                     icon={DollarSign}
                     iconBgClass="bg-emerald-500/10"
                     iconTextClass="text-emerald-400"
-                    trend={{ value: 12.5, isPositive: true }}
                 />
                 <StatsCard
                     title="Chuyến bay đang hoạt động"
-                    value={mockStats.activeFlights}
+                    value={defaultStats.activeFlights}
                     icon={Plane}
                     iconBgClass="bg-cyan-500/10"
                     iconTextClass="text-cyan-400"
                 />
                 <StatsCard
                     title="Điểm KPI"
-                    value={mockStats.kpiScore}
+                    value={defaultStats.kpiScore}
                     icon={TrendingUp}
                     iconBgClass="bg-amber-500/10"
                     iconTextClass="text-amber-400"
-                    trend={{ value: 8.3, isPositive: true }}
                 />
                 <StatsCard
                     title="Thành viên"
-                    value={mockStats.totalMembers}
+                    value={defaultStats.totalMembers}
                     icon={Users}
                     iconBgClass="bg-blue-500/10"
                     iconTextClass="text-blue-400"
@@ -138,7 +155,7 @@ export default function DashboardPage() {
                                 <Plane className="w-5 h-5 text-cyan-400" />
                                 Chuyến bay đang hoạt động
                             </h2>
-                            <Link href="/dashboard/flights">
+                            <Link href="/flights">
                                 <GlowButton variant="ghost" size="sm">
                                     Xem tất cả
                                     <ArrowUpRight className="w-4 h-4" />

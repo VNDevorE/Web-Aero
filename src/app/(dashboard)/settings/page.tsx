@@ -8,6 +8,7 @@ import {
     Save,
     Check,
     Loader2,
+    DollarSign,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 
@@ -18,6 +19,21 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState("");
+    const [balance, setBalance] = useState<number>(0);
+
+    // Fetch user balance
+    useEffect(() => {
+        const fetchBalance = async () => {
+            try {
+                const res = await fetch("/api/users/balance");
+                const data = await res.json();
+                setBalance(data.balance || 0);
+            } catch (error) {
+                console.error("Error fetching balance:", error);
+            }
+        };
+        fetchBalance();
+    }, []);
 
     useEffect(() => {
         if (session?.user?.name) {
@@ -170,10 +186,17 @@ export default function SettingsPage() {
                 <h2 className="text-lg font-semibold text-white mb-4">
                     Thông tin tài khoản
                 </h2>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                         <p className="text-gray-400">Role</p>
                         <p className="text-white font-medium">{session?.user?.role || "PILOT"}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-400">Số dư</p>
+                        <p className="text-emerald-400 font-medium flex items-center gap-1">
+                            <DollarSign className="w-4 h-4" />
+                            {balance.toLocaleString()}
+                        </p>
                     </div>
                     <div>
                         <p className="text-gray-400">Trạng thái</p>

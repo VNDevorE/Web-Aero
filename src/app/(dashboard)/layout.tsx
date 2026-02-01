@@ -14,6 +14,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [isChecking, setIsChecking] = useState(true);
+    const [balance, setBalance] = useState<number>(0);
+
+    // Fetch user balance
+    useEffect(() => {
+        const fetchBalance = async () => {
+            try {
+                const res = await fetch("/api/users/balance");
+                const data = await res.json();
+                setBalance(data.balance || 0);
+            } catch (error) {
+                console.error("Error fetching balance:", error);
+            }
+        };
+        if (status === "authenticated") {
+            fetchBalance();
+        }
+    }, [status]);
 
     // Real-time ban check on mount only
     useEffect(() => {
@@ -66,6 +83,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             name: session.user.name || "User",
             avatar: session.user.image || undefined,
             role: session.user.role || "PILOT",
+            balance: balance,
         }
         : undefined;
 
