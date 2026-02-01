@@ -1,0 +1,127 @@
+// Prisma schema for Aero Aviation Dashboard
+// Database: Supabase PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  ADMIN
+  OWNER
+  ATC
+  GROUND_CREW
+  PILOT
+}
+
+enum FlightStatus {
+  IN_FLIGHT
+  LANDED
+  EMERGENCY
+  REQUESTING_GROUND_CREW
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String    @id @default(cuid())
+  discordId     String    @unique
+  username      String
+  displayName   String?
+  avatar        String?
+  balance       Int       @default(0)
+  lastDailyDate DateTime?
+  dailyStreak   Int       @default(0)
+  role          Role      @default(PILOT)
+  
+  // Airline membership
+  airlineId     String?
+  airline       Airline?  @relation(fields: [airlineId], references: [id])
+  
+  // Flight relations
+  captainFlights      Flight[] @relation("captain")
+  firstOfficerFlights Flight[] @relation("firstOfficer")
+  
+  // KPI tracking
+  flightKpis    FlightKpi[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Airline {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  money     Int        @default(0)
+  serverId  String     // Discord server ID
+  
+  // Income range per flight
+  minIncome Int        @default(10000)
+  maxIncome Int        @default(15000)
+  
+  // Relations
+  members   User[]
+  aircraft  Aircraft[]
+  flights   Flight[]
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Aircraft {
+  id           String   @id @default(cuid())
+  name         String
+  price        Int
+  
+  airlineId    String
+  airline      Airline  @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  
+  purchaseDate DateTime @default(now())
+}
+
+model Flight {
+  id                 String       @id @default(cuid())
+  flightNumber       String
+  gate               String
+  aircraftType       String
+  departureAirport   String
+  arrivalAirport     String
+  
+  // Crew
+  captainId          String?
+  captain            User?        @relation("captain", fields: [captainId], references: [id])
+  firstOfficerId     String?
+  firstOfficer       User?        @relation("firstOfficer", fields: [firstOfficerId], references: [id])
+  
+  // Airline
+  airlineId          String
+  airline            Airline      @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  
+  // Status
+  status             FlightStatus @default(IN_FLIGHT)
+  groundCrewService  String?      // "flowme" or "pushback"
+  
+  // Timestamps
+  declaredAt         DateTime     @default(now())
+  landedAt           DateTime?
+  
+  // Income earned (calculated on landing)
+  incomeEarned       Int?
+}
+
+model FlightKpi {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serverId        String   // Discord server ID
+  flightCount     Int      @default(0)
+  lastFlightDate  DateTime @default(now())
+  
+  @@unique([userId, serverId])
+}
