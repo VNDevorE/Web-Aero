@@ -77,11 +77,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "discordId required" }, { status: 400 });
         }
 
+        const trimmedDiscordId = discordId.trim();
+
         // Check if user exists in profiles
         const { data: existingProfile } = await supabase
             .from("profiles")
             .select("*")
-            .eq("discord_id", discordId.trim())
+            .eq("discord_id", trimmedDiscordId)
             .single();
 
         if (existingProfile) {
@@ -90,18 +92,77 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: "User đã thuộc về hãng khác!" }, { status: 400 });
             }
 
+            // Prepare update data
+            const updateData: { airline_id: string; avatar?: string; username?: string; display_name?: string } = {
+                airline_id: airlineId
+            };
+
+            // If avatar is missing, fetch from Discord
+            if (!existingProfile.avatar) {
+                try {
+                    const discordResponse = await fetch(`https://discord.com/api/v10/users/${trimmedDiscordId}`, {
+                        headers: {
+                            Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+                        },
+                    });
+
+                    if (discordResponse.ok) {
+                        const discordUser = await discordResponse.json();
+                        if (discordUser.avatar) {
+                            const ext = discordUser.avatar.startsWith('a_') ? 'gif' : 'png';
+                            updateData.avatar = `https://cdn.discordapp.com/avatars/${trimmedDiscordId}/${discordUser.avatar}.${ext}`;
+                        }
+                        if (!existingProfile.username && discordUser.username) {
+                            updateData.username = discordUser.username;
+                            updateData.display_name = discordUser.username;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch Discord user for update:", e);
+                }
+            }
+
             // Update existing profile
             const { error } = await supabase
                 .from("profiles")
-                .update({ airline_id: airlineId })
-                .eq("discord_id", discordId.trim());
+                .update(updateData)
+                .eq("discord_id", trimmedDiscordId);
 
             if (error) throw error;
         } else {
-            // Create new profile
+            // Fetch user info from Discord API
+            let username = trimmedDiscordId;
+            let avatarUrl: string | null = null;
+
+            try {
+                const discordResponse = await fetch(`https://discord.com/api/v10/users/${trimmedDiscordId}`, {
+                    headers: {
+                        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+                    },
+                });
+
+                if (discordResponse.ok) {
+                    const discordUser = await discordResponse.json();
+                    username = discordUser.username || trimmedDiscordId;
+
+                    // Build avatar URL
+                    if (discordUser.avatar) {
+                        const ext = discordUser.avatar.startsWith('a_') ? 'gif' : 'png';
+                        avatarUrl = `https://cdn.discordapp.com/avatars/${trimmedDiscordId}/${discordUser.avatar}.${ext}`;
+                    }
+                }
+            } catch (discordError) {
+                console.error("Failed to fetch Discord user:", discordError);
+                // Continue without Discord data
+            }
+
+            // Create new profile with Discord info
             const { error } = await supabase.from("profiles").insert({
-                id: discordId.trim(),
-                discord_id: discordId.trim(),
+                id: trimmedDiscordId,
+                discord_id: trimmedDiscordId,
+                username: username,
+                display_name: username,
+                avatar: avatarUrl,
                 airline_id: airlineId,
                 role: "PILOT",
             });

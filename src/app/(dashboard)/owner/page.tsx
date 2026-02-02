@@ -331,17 +331,27 @@ export default function OwnerPanelPage() {
                             {members.map((member) => (
                                 <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-gray-800/50">
                                     <div className="flex items-center gap-3">
-                                        {member.avatar ? (
-                                            <img
-                                                src={member.avatar}
-                                                alt={member.display_name || member.username}
-                                                className="w-10 h-10 rounded-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-amber-400 font-bold">
-                                                {(member.display_name || member.username || "?").charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            // Use stored avatar or Discord default avatar
+                                            const avatarUrl = member.avatar ||
+                                                `https://cdn.discordapp.com/embed/avatars/${(BigInt(member.discord_id) >> BigInt(22)) % BigInt(6)}.png`;
+                                            return (
+                                                <img
+                                                    src={avatarUrl}
+                                                    alt={member.display_name || member.username}
+                                                    className="w-10 h-10 rounded-full object-cover"
+                                                    onError={(e) => {
+                                                        // Fallback to letter if image fails
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                        target.nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                            );
+                                        })()}
+                                        <div className="w-10 h-10 rounded-full bg-gray-700 hidden items-center justify-center text-amber-400 font-bold">
+                                            {(member.display_name || member.username || "?").charAt(0).toUpperCase()}
+                                        </div>
                                         <div>
                                             <p className="text-white font-medium">{member.display_name || member.username}</p>
                                             <p className="text-gray-400 text-sm">ID: {member.discord_id}</p>

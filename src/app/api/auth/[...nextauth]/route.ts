@@ -108,9 +108,8 @@ export const authOptions: NextAuthOptions = {
                         avatarUrl = `https://cdn.discordapp.com/avatars/${discordProfile.id}/${discordProfile.avatar}.png`;
                     }
 
-                    console.log(`[Auth] User ${discordProfile.id} - avatar sources: image=${discordProfile.image}, hash=${discordProfile.avatar}, final=${avatarUrl}`);
-
                     // Upsert profile to database (only for non-banned users)
+                    // Reset is_archived to false so user reappears in list
                     await supabase
                         .from("profiles")
                         .upsert({
@@ -120,6 +119,7 @@ export const authOptions: NextAuthOptions = {
                             display_name: discordProfile.name,
                             avatar: avatarUrl,
                             role: role,
+                            is_archived: false,
                             updated_at: new Date().toISOString(),
                         }, {
                             onConflict: "id"

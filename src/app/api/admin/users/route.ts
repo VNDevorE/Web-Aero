@@ -9,7 +9,7 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// GET - List all users (excluding banned users from blacklist)
+// GET - List all active users (excluding banned and archived)
 export async function GET(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Get all profiles
+        // Get all profiles (excluding archived)
         const { data: profiles, error: profilesError } = await supabase
             .from("profiles")
             .select("*")
+            .or("is_archived.is.null,is_archived.eq.false")
             .order("created_at", { ascending: false });
 
         if (profilesError) throw profilesError;
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// DELETE - Remove user from profiles (soft delete - they can re-register)
+// DELETE - Archive user (hide from list but preserve balance and role)
 export async function DELETE(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -57,25 +58,23 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: "discord_id required" }, { status: 400 });
         }
 
-        // Cannot delete admin
+        // Cannot archive admin
         if (discordId === ADMIN_DISCORD_ID) {
-            return NextResponse.json({ error: "Cannot delete admin" }, { status: 400 });
+            return NextResponse.json({ error: "Cannot archive admin" }, { status: 400 });
         }
 
-        // Delete user from profiles table
+        // Archive user: hide from list but keep balance, role, and airline_id
         const { error } = await supabase
             .from("profiles")
-            .delete()
+            .update({ is_archived: true })
             .eq("discord_id", discordId);
 
         if (error) throw error;
 
-        // Note: Blacklist entry is NOT deleted, so if user is banned they stay banned
-        // When they re-login via OAuth, a new profile will be created but they'll still be blocked
-
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error deleting user:", error);
+        console.error("Error archiving user:", error);
         return NextResponse.json({ error: "Internal error" }, { status: 500 });
     }
 }
+

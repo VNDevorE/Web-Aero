@@ -15,6 +15,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const router = useRouter();
     const [isChecking, setIsChecking] = useState(true);
     const [balance, setBalance] = useState<number>(0);
+    const [isOwner, setIsOwner] = useState<boolean>(false);
 
     // Fetch user balance
     useEffect(() => {
@@ -32,9 +33,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         }
     }, [status]);
 
-    // Real-time ban check on mount only
+    // Real-time ban and archive check on mount only
     useEffect(() => {
-        const checkBanStatus = async () => {
+        const checkStatus = async () => {
             try {
                 const res = await fetch("/api/auth/check-ban");
                 const data = await res.json();
@@ -43,19 +44,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     router.replace("/banned");
                     return;
                 }
+
+                // If archived, sign out and redirect to login
+                if (data.archived) {
+                    const { signOut } = await import("next-auth/react");
+                    await signOut({ callbackUrl: "/login" });
+                    return;
+                }
             } catch (error) {
-                console.error("Error checking ban status:", error);
+                console.error("Error checking status:", error);
             }
             setIsChecking(false);
         };
 
         if (status === "authenticated") {
-            checkBanStatus();
-            // Removed interval - middleware will catch bans on navigation
+            checkStatus();
         } else if (status !== "loading") {
             setIsChecking(false);
         }
     }, [status, router]);
+
+    // Real-time owner check
+    useEffect(() => {
+        const checkOwnerStatus = async () => {
+            try {
+                const res = await fetch("/api/owner/check");
+                const data = await res.json();
+                setIsOwner(data.isOwner === true);
+            } catch (error) {
+                console.error("Error checking owner status:", error);
+            }
+        };
+
+        if (status === "authenticated") {
+            checkOwnerStatus();
+        }
+    }, [status]);
 
     // Redirect to login if not authenticated
     if (status === "loading" || isChecking) {
@@ -88,7 +112,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         : undefined;
 
     const isAdmin = session?.user?.isAdmin || false;
-    const userRole = session?.user?.role || "PILOT";
+    // Use real-time owner check combined with session role
+    const userRole = isOwner ? "OWNER" : (session?.user?.role || "PILOT");
 
     return (
         <div className="min-h-screen bg-background-primary">
